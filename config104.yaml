@@ -1,0 +1,36 @@
+resources:
+  salmon_index: /hpf/largeprojects/tgnode/sandbox/yliang_analysis/pacbio_longread/annotation_files/Homo_sapiens_GRCh38_salmon_index
+  fai: /hpf/largeprojects/tgnode/sandbox/yliang_analysis/pacbio_longread/annotation_files/masked_genome/Homo_sapiens.GRCh38.ercc_sirv_set4_maskedglobin.fasta.fai
+  fasta: /hpf/largeprojects/tgnode/sandbox/yliang_analysis/pacbio_longread/annotation_files/masked_genome/Homo_sapiens.GRCh38.ercc_sirv_set4_maskedglobin.fasta
+  globin: /hpf/projects/dig2/acelik_analysis/clinical_pipeline/genomes/hg38/GATK_exclude.intervals
+  gtf: /hpf/largeprojects/tgnode/sandbox/yliang_analysis/pacbio_longread/annotation_files/Homo_sapiens.GRCh38.104.ercc_sirv_set4.gtf
+  refseq_txdb: /hpf/projects/dig2/acelik_analysis/clinical_pipeline/genomes/hg38/hg38.refGene.UCSC.txdb
+  ribo_int: /hpf/projects/dig2/acelik_analysis/clinical_pipeline/genomes/hg38/LL_rRNA.interval_list
+  bbduk_ref: /hpf/largeprojects/tgnode/sandbox/yliang_analysis/pacbio_longread/annotation_files/Homo_sapiens.GRCh38.115.hemoglobins.fa
+  rsem_index: /hpf/largeprojects/tgnode/sandbox/yliang_analysis/pacbio_longread/annotation_files/masked_RSEM_1.3.3_v104_index/masked_RSEM_1.3.3_v104_index
+  spikeins: /hpf/largeprojects/tgnode/sandbox/yliang_analysis/pacbio_longread/annotation_files/sirv_ercc_conc.csv
+  star_index: /hpf/largeprojects/tgnode/sandbox/yliang_analysis/pacbio_longread/annotation_files/masked_star_2.7.11b_v104_STAR_index
+  tx_db: /hpf/projects/dig2/acelik_analysis/clinical_pipeline/genomes/hg38/Homo_sapiens.GRCh38_sirv_ercc.db
+  y_genes: /hpf/projects/dig2/acelik_analysis/clinical_pipeline/genomes/hg38/hg38_y_genes.txt
+  chrom_info: /hpf/largeprojects/tgnode/sandbox/yliang_analysis/pacbio_longread/annotation_files/GRCh38_sirv_ChromInfo.txt
+script_parameters:
+  candidate_region: null
+  expression_cutoff: 4
+  expression_lof_cutoff: 1.5
+  expression_z_score_cutoff: 2
+  junction_cutoff: 5
+  junction_fraction_cutoff: 0.02
+  junction_missing_gtex_frac: 0.98
+  junction_missing_gtex_ratio: 0.1
+  junction_missing_ratio: 0.05
+  junction_novel_frac: 0.02
+  junction_novel_ratio: 0.02
+  junction_outlier_frac: 0.3
+  junction_outlier_mean_ratio: 1.25
+  junction_zscore_cutoff: 3
+  mode: normal
+  refflat_ngenes: 500
+  sum_qc_out_suffix: .qcsum.txt
+  sum_qc_seq_len: 150
+  sum_qc_tx_len: 111579398
+  trimming: 'TRUE'
