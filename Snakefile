@@ -11,20 +11,43 @@ sample_config=os.path.join(config["sampleInfo"]["dir"], "config.yaml")
 trimming=True
 SCRATCH = os.environ["SCRATCH"]
 
+# Whether the alignment reference has the globin loci masked out. Detected from
+# the fasta name rather than configured separately, so the two cannot drift apart.
+globin_masked = "maskedglobin" in os.path.basename(config["resources"]["fasta"]).lower()
+
 if tissue.lower() == "blood":
     filter_cmd = """
     bbduk.sh -Xmx24g threads=12 \
     in1={input.r1} in2={input.r2} \
     out1={output.out1} out2={output.out2} \
     ref={input.ref} outm={params.globinread} \
-    k=31 stats={output.stats}
+    k=31 stats={output.stats} 2> {params.bbduk_log} || {{ cat {params.bbduk_log} >&2; exit 1; }}
+    cat {params.bbduk_log} >&2
 
     gzip -f {params.globinread}
+
+    # Scratch writes are only acknowledged by the page cache; a failed writeback
+    # is reported to nobody once bbduk exits. Force the flush so the error lands
+    # here instead of surfacing as corrupt reads in salmon/STAR.
+    sync --data {output.out1} {output.out2}
+
+    # bbduk's "Result:" counts reads across BOTH mates. Do not derive this from
+    # stats' #Matched: in paired mode both mates are dropped when either matches,
+    # so #Matched undercounts removals and the check would misfire every run.
+    n_result=$(awk '/^Result:/{{print $2}}' {params.bbduk_log})
+    exp=$(( n_result / 2 ))
+    n1=$(( $(wc -l < {output.out1}) / 4 ))
+    n2=$(( $(wc -l < {output.out2}) / 4 ))
+    if [ "$n1" -ne "$exp" ] || [ "$n2" -ne "$exp" ]; then
+        echo "ERROR: bbduk output truncated: expected $exp records/mate, got R1=$n1 R2=$n2" >&2
+        exit 1
+    fi
     """
 else:
     filter_cmd = """
-    cp {input.r1} {output.out1}
-    cp {input.r2} {output.out2}
+    mv {input.r1} {output.out1}
+    mv {input.r2} {output.out2}
+
     echo "NA" > {output.stats}
     echo "NA" > {params.globinread}
     """
@@ -82,7 +105,8 @@ rule trimming:
         html=os.path.join(output_dir,f'{sampleID}fastp.html')
     params:
         outdir=output_dir,
-        sampleID=f'{sampleID}'
+        sampleID=f'{sampleID}',
+        scratch=SCRATCH
     threads: 10
     singularity:
         "/hpf/largeprojects/tgnode/sandbox/yliang_analysis/tools/containers/sr_rnaseq.sif"
@@ -91,6 +115,22 @@ rule trimming:
         fastp -w 10 -i {input.r1} -I {input.r2} -o {output.paired1} -O {output.paired2} \
         --unpaired1 {output.unpaired1} --unpaired2 {output.unpaired2} --failed_out {output.failed_read} \
         -h {output.html} -j {output.json}
+
+        # fastp does not fsync. Force the flush so a failed scratch write fails
+        # this rule rather than silently corrupting the input to bbduk.
+        sync --data {output.paired1} {output.paired2}
+
+        # Cross-check what landed on disk against what fastp says it wrote.
+        n_exp=$(grep -A2 '"read1_after_filtering"' {output.json} | grep '"total_reads"' | grep -o '[0-9][0-9]*')
+        n1=$(( $(wc -l < {output.paired1}) / 4 ))
+        n2=$(( $(wc -l < {output.paired2}) / 4 ))
+        if [ "$n1" -ne "$n_exp" ] || [ "$n2" -ne "$n_exp" ]; then
+            echo "ERROR: trimmed FASTQ truncated: fastp reported $n_exp reads/mate, found R1=$n1 R2=$n2" >&2
+            exit 1
+        fi
+
+        avail=$(df -h "{params.scratch}")
+        echo "Available space: $avail"
         """
 
 rule filter_globin_read:
@@ -107,7 +147,8 @@ rule filter_globin_read:
     params:
         outdir=output_dir,
         sampleID=f'{sampleID}',
-        globinread=os.path.join(output_dir,f'{sampleID}_globinread.fq')
+        globinread=os.path.join(output_dir,f'{sampleID}_globinread.fq'),
+        bbduk_log=os.path.join(output_dir,f'{sampleID}_bbduk.log')
     threads: 10
     singularity:
         "/hpf/largeprojects/tgnode/sandbox/yliang_analysis/tools/containers/sr_rnaseq.sif"
@@ -123,8 +164,8 @@ rule salmon_quant:
         #r2 = os.path.join(output_dir, f"{sampleID}_R2_trim_paired.fq.gz"),
         index = config["resources"]["salmon_index"] 
     output:
-        quant_sf = os.path.join(output_dir, "salmon_output", f"{sampleID}", "quant.sf"),
-        out_dir = directory(os.path.join(output_dir, "salmon_output", f"{sampleID}"))
+        quant_sf = os.path.join(output_dir, "salmon115", "quant.sf"),
+        out_dir = directory(os.path.join(output_dir, "salmon115"))
     params:
         lib_type = "A", 
         extra = "--seqBias --gcBias"
@@ -190,6 +231,7 @@ rule star:
 
         avail=$(df -h "{params.scratch}")
         echo "Available space: $avail"
+        echo "Open file limit: $(ulimit -n)"
 
         STAR --runMode alignReads \
             --outTmpDir "$tmpdir" \
@@ -406,13 +448,22 @@ rule predict_tissue:
     params:
         outdir=output_dir,
         sampleID=f'{sampleID}',
-        script=os.path.join(workflow.basedir, "scripts/predict.py")
+        script=os.path.join(workflow.basedir, "scripts/predict.py"),
+        # The globin panel only means anything where the reference still carries
+        # the globin loci. config.yaml points at a masked build, config_unmask.yaml
+        # does not; on a masked run every globin TPM is ~0 whatever was in the
+        # tube, and purity.py must say NA rather than report a reassuring 0.
+        #
+        # Note there is deliberately NO --score-as here. predict.py reads the
+        # submitted tissue from config.yaml itself; passing it as an override
+        # would mark every sample human-asserted and disable the agreement check.
+        globin_masked="--globin-masked" if globin_masked else ""
     threads: 8
     singularity:
         "/hpf/largeprojects/tgnode/sandbox/yliang_analysis/tools/containers/sr_rnaseq.sif"
     shell:
         """
-        python {params.script} {input} > {output}
+        python {params.script} {params.globin_masked} {input} > {output}
 
         """
 

@@ -139,8 +139,8 @@ def create_sample_configs(sample_sheet, output_dir, config_yaml, pipeline, resub
                    'config': sample_config_path,
                    "name": sample_id,
                    'dir': sample_dir,
-                   'err': sample_dir + "/" + sample_id + ".err",
-                   'out': sample_dir + "/" + sample_id + ".out"})
+                   'err': sample_dir + "/" + sample_id + "-%j.err",
+                   'out': sample_dir + "/" + sample_id + "-%j.out"})
         
         try:
             jobid = subprocess.run(

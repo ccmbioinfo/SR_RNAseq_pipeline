@@ -1,0 +1,69 @@
+# Marker panels for the sample-purity score (purity.py).
+# gene_id pinned to Ensembl 115 -- the annotation the RSEM index is built from.
+# Regenerate if the index annotation changes; symbols are for humans only.
+#
+# Deliberate exclusions:
+#   S100A8/A9/A12, LYZ  keratinocytes express them; would read skin as blood
+#   PTPRC               LCLs are leukocytes
+#   IL7R                fibroblasts express it (median 30 TPM, max 90)
+#   TRBC2, LCK          expressed in LCL (257 and 100 TPM)
+#   HBG1, HBG2          only partly survive globin depletion
+gene_id	symbol	panel
+ENSG00000162747	FCGR3B	blood_myeloid
+ENSG00000119535	CSF3R	blood_myeloid
+ENSG00000085265	FCN1	blood_myeloid
+ENSG00000163563	MNDA	blood_myeloid
+ENSG00000180871	CXCR2	blood_myeloid
+ENSG00000112303	VNN2	blood_myeloid
+ENSG00000103569	AQP9	blood_myeloid
+ENSG00000158578	ALAS2	blood_erythroid
+ENSG00000169877	AHSP	blood_erythroid
+ENSG00000004939	SLC4A1	blood_erythroid
+ENSG00000244734	HBB	blood_globin
+ENSG00000206172	HBA1	blood_globin
+ENSG00000188536	HBA2	blood_globin
+ENSG00000223609	HBD	blood_globin
+ENSG00000198851	CD3E	lymphoid_t
+ENSG00000167286	CD3D	lymphoid_t
+ENSG00000116824	CD2	lymphoid_t
+ENSG00000198821	CD247	lymphoid_t
+ENSG00000156738	MS4A1	lymphoid_b
+ENSG00000177455	CD19	lymphoid_b
+ENSG00000105369	CD79A	lymphoid_b
+ENSG00000159958	TNFRSF13C	lymphoid_b
+ENSG00000167768	KRT1	skin_cornified
+ENSG00000172867	KRT2	skin_cornified
+ENSG00000186395	KRT10	skin_cornified
+ENSG00000143631	FLG	skin_cornified
+ENSG00000143520	FLG2	skin_cornified
+ENSG00000203782	LORICRIN	skin_cornified
+ENSG00000204539	CDSN	skin_cornified
+ENSG00000105141	CASP14	skin_cornified
+ENSG00000134765	DSC1	skin_cornified
+ENSG00000186081	KRT5	skin_basal
+ENSG00000186847	KRT14	skin_basal
+ENSG00000128422	KRT17	skin_basal
+ENSG00000205420	KRT6A	skin_basal
+ENSG00000185479	KRT6B	skin_basal
+ENSG00000186832	KRT16	skin_basal
+ENSG00000065618	COL17A1	skin_basal
+ENSG00000134757	DSG3	skin_basal
+ENSG00000134762	DSC3	skin_basal
+ENSG00000073282	TP63	skin_basal
+ENSG00000167754	KLK5	skin_basal
+ENSG00000169035	KLK7	skin_basal
+ENSG00000104879	CKM	muscle
+ENSG00000168530	MYL1	muscle
+ENSG00000143632	ACTA1	muscle
+ENSG00000155657	TTN	muscle
+ENSG00000125414	MYH2	muscle
+ENSG00000130595	TNNT3	muscle
+ENSG00000183091	NEB	muscle
+ENSG00000133055	MYBPH	muscle
+ENSG00000108821	COL1A1	fibroblast
+ENSG00000164692	COL1A2	fibroblast
+ENSG00000168542	COL3A1	fibroblast
+ENSG00000011465	DCN	fibroblast
+ENSG00000139329	LUM	fibroblast
+ENSG00000133110	POSTN	fibroblast
+ENSG00000154096	THY1	fibroblast

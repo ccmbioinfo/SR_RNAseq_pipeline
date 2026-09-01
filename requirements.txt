@@ -1,7 +1,0 @@
-cython
-numpy
-pandas
-pip
-snakemake
-SQLAlchemy
-PyYAML

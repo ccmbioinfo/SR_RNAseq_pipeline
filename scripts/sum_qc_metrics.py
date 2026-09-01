@@ -454,7 +454,96 @@ def parse_tissue_pred(path, sample):
         warn("no tissue prediction row for %s" % sample)
         return out
     out["TISSUE_PRED"] = row.get("predicted") or NA
+    # purity.py fields, present since the purity module was added to predict.py.
+    # Older tissuePred files lack them and score NA, so this stays backward
+    # compatible with samples processed before the change.
+    #
+    # Only three of purity.py's eight fields are reported. The dropped five were
+    # either near-constant (purity_ref_source is always "agreed" -- the Snakefile
+    # passes no --score-as; purity_not_assessed is a property of the reference
+    # tissue, not the sample), redundant with what is kept (purity_reference
+    # equals the canonicalized submitted tissue whenever the source is "agreed"),
+    # or too narrow to earn a column (skin_form, non-null only when a skin panel
+    # trips, and already implied by which panel is named in purity_flags).
+    #
+    # PURITY_REASON is read but NOT emitted: qc_call() needs it to raise the
+    # TISSUE_MISMATCH flag. Do not drop it here. Its other values stay recoverable
+    # from the reported columns -- no_submitted leaves TISSUE_SUBMITTED as NA, and
+    # unsupported_submitted leaves the offending free-text label visible there.
+    for src, dst in (("submitted_tissue", "TISSUE_SUBMITTED"),
+                     ("purity_call", "PURITY_CALL"),
+                     ("purity_flags", "PURITY_FLAGS"),
+                     ("purity_reason", "PURITY_REASON")):
+        out[dst] = row.get(src) or NA
     return out
+
+
+# Absolute QC cutoffs, applied identically to all studies. (metric, direction,
+# WARN, FAIL); "min" means higher is better. TOTAL_READS counts aligned PAIRS, so
+# the 40 M floor is roughly 80 M reads.
+#
+# GLOBIN_PERC is deliberately absent: high globin carry-over costs a blood library
+# effective depth, but the reads that remain are ordinarily fine, so it is a
+# covariate to check rather than a gate.
+QC_RULES = [
+    ("TOTAL_READS",                  "min", 50e6, 40e6),
+    ("PCT_READS_PASS",               "min", 95,   90),
+    ("Q30_RATE_TRIM",                "min", 90,   85),
+    ("PCT_UNIQ_ALIGNED",             "min", 90,   85),
+    ("PCT_EXON",                     "min", 70,   65),
+    ("PCT_INTERGENIC",               "max", 3,    5),
+    ("PCT_RIBOSOMAL",                "max", 2,    5),
+    ("TIN_MEDIAN",                   "min", 75,   70),
+    ("PERCENT_DUPLICATION",          "max", 60,   75),
+    ("MEDIAN_5PRIME_TO_3PRIME_BIAS", "max", 1.4,  1.6),
+    ("ERCC_R2",                      "min", 0.85, 0.80),
+]
+
+
+def qc_call(data):
+    """{QC_CALL, QC_FLAGS} from the absolute cutoffs above.
+
+    Any FAIL metric -> FAIL; two or more WARN metrics -> REVIEW; else PASS. A
+    missing metric scores NA and never fails, which in practice means ERCC_R2
+    only applies to spiked-in libraries.
+
+    This is the absolute arm of the QC rule only. The report's second arm -- three
+    or more metrics beyond 3.5 robust z from their within-tissue median -- needs a
+    cohort to compute that median against, and this script sees one sample. On the
+    296-library cohort the two agree on 289 calls, differing only on REVIEWs the
+    outlier arm raised alone, so this is a faithful gate and a slightly permissive
+    triage. The outlier arm stays in the report, where the cohort exists.
+    """
+    failed, warned = [], []
+    for metric, direction, warn_at, fail_at in QC_RULES:
+        value = data.get(metric)
+        if value is None or value == NA:
+            continue
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            continue
+        if (value < fail_at) if direction == "min" else (value > fail_at):
+            failed.append(metric)
+        elif (value < warn_at) if direction == "min" else (value > warn_at):
+            warned.append(metric)
+
+    flags = []
+    if failed:
+        flags.append("FAIL:" + ",".join(failed))
+    if warned:
+        flags.append("WARN:" + ",".join(warned))
+    call = "FAIL" if failed else ("REVIEW" if len(warned) >= 2 else "PASS")
+
+    # Submitted and predicted tissue disagreeing is not a sequencing-metric
+    # problem, so it does not move QC_CALL -- but it is worth seeing. Across 365
+    # libraries in the 2026-08 cohort there were zero true mismatches (the only
+    # disagreements were tissues the four-class model has no label for), so this
+    # firing means something happened, not that the check is noisy.
+    if data.get("PURITY_REASON") == "tissue_mismatch":
+        flags.append("TISSUE_MISMATCH:%s/%s" % (data.get("TISSUE_SUBMITTED", "?"),
+                                                data.get("TISSUE_PRED", "?")))
+    return {"QC_CALL": call, "QC_FLAGS": ";".join(flags)}
 
 
 def linreg_r2(xs, ys):
@@ -629,12 +718,16 @@ COLUMNS = [
     "MEDIAN_5PRIME_TO_3PRIME_BIAS", "PCT_RIBOSOMAL",
     "PERCENT_DUPLICATION", "INNER_DISTANCE_MEAN", "INNER_DISTANCE_MEDIAN",
     "TIN_MEDIAN", "TIN_MEAN", "STRANDEDNESS", "PCT_ANTISENSE", "MT_PCT",
-    "GLOBIN_PERC",
     "TPM_0", "TPM_1", "TPM_10", "TPM_50",
-    "CHRY_PERC", "SEX_PRED", "TISSUE_PRED",
+    "CHRY_PERC", "SEX_PRED",
     "NUM_JUNCS", "KNOWN_JUNCS", "NOVEL_JUNCS",
     "ERCC_TPM_SUM", "ERCC_TPM_0", "ERCC_TPM_1", "ERCC_R2",
     "SIRV_TPM_SUM", "SIRV1", "SIRV2", "SIRV3", "SIRV4", "SIRV5", "SIRV6", "SIRV7",
+    # the sample-identity block: what came out of the library, what the classifier
+    # made of it, what the sheet said it was, and whether anything else is in it
+    "GLOBIN_PERC", "TISSUE_PRED",
+    "TISSUE_SUBMITTED", "PURITY_CALL", "PURITY_FLAGS",
+    "QC_CALL", "QC_FLAGS",
 ]
 
 
@@ -672,6 +765,9 @@ def main():
     data.update(parse_globin(opt.globin_file))
     data.update(parse_ercc(opt.ercc_file))
     data.update(parse_sirv(opt.sirv_file))
+
+    # last: every metric it reads must already be in `data`
+    data.update(qc_call(data))
 
     out_path = os.path.join(opt.outdir, s + opt.outname)
     with open(out_path, "w", newline="") as fh:

@@ -1,0 +1,19 @@
+# samples dropped from the calibration set, and why.
+# 'exclude' rows are candidate contamination -- review them.
+drop	TG:2185_SK4068_new	unsupported_submitted	submitted= predicted=LCL
+drop	TG:2887_SK4067_new	unsupported_submitted	submitted= predicted=Blood
+drop	TG:DSK_058_03	unsupported_submitted	submitted=SIGMOIDCOLON predicted=Fibroblasts
+drop	TG:DSK_139_03	unsupported_submitted	submitted=SALIVARYGLAND predicted=Muscle
+drop	TG:DSK_143_03	unsupported_submitted	submitted=Heart predicted=Muscle
+drop	TG:GD-058-03	unsupported_submitted	submitted=Skin predicted=Fibroblasts
+drop	TG:GM17398	unsupported_submitted	submitted=cell_line predicted=Fibroblasts
+drop	TG:GM18429	unsupported_submitted	submitted=cell_line predicted=Fibroblasts
+drop	TG:GM27955	unsupported_submitted	submitted=cell_line predicted=LCL
+drop	ComplexCare:20-10333_new	unsupported_submitted	submitted= predicted=Blood
+exclude	TG:010_0037B	Fibroblasts	lymphoid_b=108.89 support=4 bound=12.3 (8.8% of pure lymphoid_b)
+exclude	TG:24-3916	Fibroblasts	skin_basal=6190.48 support=3 bound=692.0 (58% of pure skin_basal)
+exclude	TG:DSK_099_03	Fibroblasts	skin_basal=5003.11 support=7 bound=692.0 (47% of pure skin_basal)
+exclude	TG:DSK_206_03	Fibroblasts	skin_basal=908.27 support=6 bound=692.0 (8.5% of pure skin_basal)
+exclude	TG:003_0048A	LCL	lymphoid_t=27.2 support=4 bound=9.3 (2.9% of pure lymphoid_t)
+exclude	TG:2348_SK0481	LCL	skin_cornified=3779.63 support=5 bound=373.6 (10% of pure skin_cornified)
+exclude	TG:2348_SK0481	LCL	skin_basal=1081.9 support=9 bound=106.8 (10% of pure skin_basal)
