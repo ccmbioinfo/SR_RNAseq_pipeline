@@ -10,10 +10,51 @@ resources:
   rsem_index: /hpf/largeprojects/tgnode/sandbox/yliang_analysis/pacbio_longread/annotation_files/RSEM_1.3.3_v115_index/RSEM_1.3.3_v115_index
   spikeins: /hpf/largeprojects/tgnode/sandbox/yliang_analysis/pacbio_longread/annotation_files/sirv_ercc_conc.csv
   star_index: /hpf/largeprojects/tgnode/sandbox/yliang_analysis/pacbio_longread/annotation_files/star_2.7.11b_v115_STAR_index
-  tx_db: /hpf/projects/dig2/acelik_analysis/clinical_pipeline/genomes/hg38/Homo_sapiens.GRCh38_sirv_ercc.db
   y_genes: /hpf/projects/dig2/acelik_analysis/clinical_pipeline/genomes/hg38/hg38_y_genes.txt
   chrom_info: /hpf/largeprojects/tgnode/sandbox/yliang_analysis/pacbio_longread/annotation_files/GRCh38_sirv_ChromInfo.txt
+  tx2gene: /hpf/largeprojects/tgnode/sandbox/yliang_analysis/pacbio_longread/annotation_files/Homo_sapiens.GRCh38.115.tx2gene.txt
+  container: /hpf/largeprojects/tgnode/sandbox/yliang_analysis/tools/containers/sr_rnaseq.sif.20261005.sif
+  rustqc_container: /hpf/largeprojects/tgnode/sandbox/yliang_analysis/tools/containers/rustqc.sif
 script_parameters:
   refflat_ngenes: 500
   sum_qc_out_suffix: .qcsum.txt
   trimming: 'TRUE'
+  OUTRIDER: true
+  FRASER: true
+fraser:
+  # Per-tissue frozen control cohort bundles: <cohort_root>/<tissue>/fraser_objs
+  # (built/rebuilt by fraser_cohort.R build/add -- never written to by a
+  # per-sample Snakemake run). A tissue with no bundle here is skipped, not
+  # failed -- see FRASER_ENABLED in Snakefile_fraser.
+  cohort_root: /hpf/largeprojects/tgnode/sandbox/rnaseq_repo/control_cohort/09182026
+  # Shared txdb cache (see fraser-txdb-shared-cache) -- same one fraser_cohort.R
+  # fit resolves by default (its DEFAULT_TXDB), used again here so
+  # fraser_parse's splice-impact annotation (potentialImpact/causesFrameshift/
+  # UTR_overlap) is scored against the exact gene models the fit itself used.
+  # Pins the annotation release (GRCh38.115); bump both together.
+  txdb: /hpf/largeprojects/tgnode/sandbox/yliang_analysis/pacbio_longread/annotation_files/Homo_sapiens.GRCh38.115.txdb.db
+  # q is pinned per tissue rather than re-estimated (OHT) per case: with a
+  # frozen panel and one varying sample, per-run re-estimation would be the
+  # only remaining source of cross-sample drift. A tissue whose cohort exists
+  # but has no entry here will KeyError in rule fraser_fit -- deliberately,
+  # rather than silently falling back to a per-run OHT estimate.
+  q:
+    # q=1 is verified for the 22- and 23-sample LCL fits (runs.tsv, jobs
+    # 29649992 / 30193365). The CURRENT 50-sample LCL cohort has only been
+    # built, never fit -- its runs.tsv has one row (build, 2026-09-02) with q
+    # blank -- so q=1 here is a carry-forward assumption, NOT yet re-verified
+    # at this cohort size. Confirm against runs.tsv after the first fit and
+    # update this value (and comment) if OHT gives something different.
+    LCL: 2
+    Blood: 7
+    Fibroblasts: 1
+outrider:
+  cohort_root: 
+    LCL: /hpf/largeprojects/tgnode/sandbox/rnaseq_repo/control_cohort/Sept2026/LCL/highQual_samples_outrider_input_LCL.txt
+    Blood: /hpf/largeprojects/tgnode/sandbox/rnaseq_repo/control_cohort/Sept2026/Blood/highQual_samples_outrider_input_Blood.txt
+    Fibroblasts: /hpf/largeprojects/tgnode/sandbox/rnaseq_repo/control_cohort/Sept2026/Fibroblasts/highQual_samples_outrider_input_Fibroblasts.txt
+  txdb: /hpf/largeprojects/tgnode/sandbox/yliang_analysis/pacbio_longread/annotation_files/Homo_sapiens.GRCh38.115.txdb.db
+  q:
+    LCL: 10
+    Blood: 28
+    Fibroblasts: 6

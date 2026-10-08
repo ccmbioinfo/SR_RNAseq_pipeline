@@ -36,7 +36,7 @@ if __name__ == "__main__":
     gene=gene[gene["gene_id"].str.contains("ERCC")]
 
     iso=pd.read_csv(args.iso, header=0, sep="\t")
-    iso=iso[iso["gene_id"].str.contains("SIRV")]
+    iso=iso[iso["Name"].str.contains("SIRV")]
 
     #TODO split this into two get the ERCC
 
@@ -49,7 +49,14 @@ if __name__ == "__main__":
     gene_merged.to_csv(gene_name, sep="\t", index=False, header=True)
 
     iso_name = args.analysis_path+"/"+args.samplename + ".sirv.txt"
-    iso_merged = pd.merge(iso[["transcript_id", "TPM", "IsoPct"]],
-                           actual, how='inner', on='transcript_id')
+    #iso_merged = pd.merge(iso[["transcript_id", "TPM", "IsoPct"]],
+    #                       actual, how='inner', on='transcript_id')
+    iso_merged = pd.merge(
+    iso[["Name", "TPM", "NumReads"]],
+    actual,
+    how="inner",
+    left_on="Name",
+    right_on="transcript_id"
+)
 
     iso_merged.to_csv(iso_name, sep="\t", index=False, header=True)

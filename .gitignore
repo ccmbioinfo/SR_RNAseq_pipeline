@@ -3,3 +3,5 @@
 .fontconfig/
 .java/
 python_venv/
+scripts/__pycache__/
+.snakemake/

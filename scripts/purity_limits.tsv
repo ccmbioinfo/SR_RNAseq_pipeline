@@ -26,7 +26,7 @@ Fibroblasts	muscle	10	30	68785.8	0.0001454	active	28	q99=0.00; max=0.00; denomin
 Fibroblasts	fibroblast					expected	28	native to this tissue
 LCL	blood_myeloid	240	720	6216.67	0.03861	underpowered	47	q99=80.00; max=81.42; denominator cohort:Blood n=203
 LCL	blood_erythroid	10	30	483.96	0.02066	underpowered	47	q99=0.00; max=0.00; denominator cohort:Blood n=203
-LCL	blood_globin	321.3	963.8			no_reference	47	q99=107.09; max=193.33; no pure-tissue reference; fraction not computable
+LCL	blood_globin	16.94	50.81			no_reference	43	q99=5.65; max=5.86; no pure-tissue reference; fraction not computable; 2026-09-17 MANUAL recalibration excluding DSK_116_03 (globin-only signal -- HBB/HBA1/HBA2 elevated but ALAS2/AHSP/SLC4A1 not, no globin-depletion step in this pipeline to blame; likely trace RBC/reticulocyte mRNA carryover) and GM27955 (submitted=cell_line, ineligible per purity_limits.tsv.log, was wrongly counted in this manual pass' source list; zero net effect, support<2 zeroed it already); n=43 is TG_RNAseq-accessible members only, official clean set was 47 across all project folders -- rerun calibrate_purity.py properly when convenient
 LCL	lymphoid_t	22.6	67.8	929.64	0.02431	underpowered	47	q99=7.53; max=9.06; denominator cohort:Blood n=203
 LCL	lymphoid_b					expected	47	native to this tissue
 LCL	skin_cornified	10	30	37360.4	0.0002677	active	47	q99=0.00; max=0.00; denominator GD-058-03, submitted Skin, n=1

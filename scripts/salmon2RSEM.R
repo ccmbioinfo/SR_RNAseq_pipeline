@@ -62,8 +62,14 @@ option_list <- list(
     make_option(
       c("-c", "--countsFrom"),
       type = "character",
-      help = "Argument passed to countsFromAbundance, default 'lengthScaledTPM'",
-      default = "lengthScaledTPM"
+      help = "Argument passed to countsFromAbundance, default set to 'no', can be set to 'lengthScaledTPM' or 'scaledTPM'",
+      default = "no"
+    ),
+    make_option(
+      c("--genelist"),
+      type = "character",
+      help = "List of gene IDs exist in gtf files, only these genes are reported. Default to '/hpf/largeprojects/tgnode/sandbox/yliang_analysis/pacbio_longread/annotation_files/gene_id_name_biotype_gtf115_new.tsv'",
+      default = "/hpf/largeprojects/tgnode/sandbox/yliang_analysis/pacbio_longread/annotation_files/gene_id_name_biotype_gtf115_new.tsv"
     )
 )
 
@@ -102,6 +108,8 @@ salmon_file <- file.path(
     salmon_dir,
     "quant.sf"
 )
+
+genelist_file <- opt$genelist
 
 # ------------------------------------------------------------
 # Determine sample ID
@@ -165,9 +173,9 @@ cat(
     sep = ""
 )
 
-tx2gene <- read_tsv(
+tx2gene <- read.table(
     tx2gene_file,
-    show_col_types = FALSE
+    col.names = c("TXNAME","GENEID")
 )
 
 # Check columns
@@ -307,11 +315,14 @@ missing_file <- file.path(
     )
 )
 
-write_tsv(
+if(nrow(missing_transcripts) >0){
+  write_tsv(
     missing_transcripts,
     missing_file,
     col_names = FALSE
-)
+  )
+}
+
 
 n_total <- nrow(salmon)
 
@@ -486,14 +497,36 @@ gene_results <- gene_results %>%
 # rounded to whole reads so the column is usable directly by
 # count-based models, which is the point of the lengthScaledTPM
 # default above.
+# filter for only genes in the gtf file
 # ------------------------------------------------------------
+
+cat(
+  "\nFiltering for genes in: ",
+  genelist_file,
+  "\n",
+  sep = ""
+)
+
+used_genes <- as.character(read.table(genelist_file, header = F, sep = "\t")[,1])
+
+n_missing <- length(gene_results$gene_id[!gene_results$gene_id %in% used_genes])
+
+cat(
+  "\n",
+  n_missing,
+  " genes removed, not in provided gene list\n",
+  sep = ""
+)
 
 gene_results <- gene_results %>%
     mutate(
         length           = round(length, 2),
         effective_length = round(effective_length, 2),
         expected_count   = round(expected_count)
-    )
+    ) %>% 
+  filter(gene_id %in% used_genes)
+
+
 
 # ------------------------------------------------------------
 # Write output
