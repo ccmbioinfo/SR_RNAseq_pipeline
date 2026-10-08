@@ -300,7 +300,7 @@ rule star:
         #s1_out_multiwig=temp(os.path.join(output_dir,f'{sampleID}Signal.UniqueMultiple.str1.out.wig')),
         #s2_out_multiwig=temp(os.path.join(output_dir,f'{sampleID}Signal.UniqueMultiple.str2.out.wig')),
         #star_tmp=directory(os.path.join(output_dir,f'{sampleID}_STARtmp')),
-    params:    
+    params:
         index=config["resources"]["star_index"],
         gtf=config["resources"]["gtf"],
         prefix=os.path.join(output_dir,f'{sampleID}'),
@@ -487,7 +487,7 @@ rule bam_to_bigwig:
         sampleID=f'{sampleID}'
     threads: 10
     singularity:
-        config["resources"]["container"]"
+        config["resources"]["container"]
     shell:
         """
         # Biological + strand
@@ -764,7 +764,7 @@ rule rustqc:
         """
         cd {params.outdir}
 
-        mkdir rustqc
+        mkdir -p rustqc
         
         cd rustqc
 
@@ -824,7 +824,7 @@ rule multiqc:
     shell:
         """
         cd {params.outdir}
-        mkdir err_out_folder
+        mkdir -p err_out_folder
         find . -name '*.err' -exec mv -t ./err_out_folder/ {{}} +
         find . -name '*.out' -exec mv -t ./err_out_folder/ {{}} +
 
