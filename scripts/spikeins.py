@@ -22,7 +22,7 @@ if __name__ == "__main__":
     parser = arg.ArgumentParser(description='combine detected ERCC/SIRV along with actual values for ERCC just a '
                                             'comparison of actual vs detected concentraion but in different units'
                                             'using TPM for all these measurements')
-    parser.add_argument('--gene', type=str, help='gene expression values', action="store")
+    parser.add_argument('--gene', type=str, help='unused; kept for the existing Snakefile call', action="store")
     parser.add_argument('--iso', type=str, help='isoform expression values', action="store")
     parser.add_argument('--actual', type=str, help='actual concentrations', action="store")
     parser.add_argument('--samplename', type=str, help='samplename', action="store")
@@ -30,20 +30,22 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    #TODO get ERCC for gene and SIRV for ISO
-
-    gene=pd.read_csv(args.gene, header=0, sep="\t")
-    gene=gene[gene["gene_id"].str.contains("ERCC")]
-
-    iso=pd.read_csv(args.iso, header=0, sep="\t")
-    iso=iso[iso["Name"].str.contains("SIRV")]
-
-    #TODO split this into two get the ERCC
+    # Both ERCC and SIRV come from the transcript-level salmon quant.sf (--iso).
+    # ERCC used to be read from the gene table (--gene), but salmon2RSEM.R keeps
+    # only genes in its --genelist, which drops every ERCC- row, so ercc.txt came
+    # out header-only. Each ERCC is a single transcript mapped to itself in
+    # tx2gene, so its transcript TPM is its gene TPM. --gene is still accepted so
+    # the Snakefile call is unchanged, but it is no longer read.
+    quant=pd.read_csv(args.iso, header=0, sep="\t")
+    iso=quant[quant["Name"].str.contains("SIRV")]
+    ercc=quant[quant["Name"].str.startswith("ERCC-")]
+    ercc=ercc[["Name", "TPM"]].rename(columns={"Name": "gene_id"})
 
     actual = pd.read_csv(args.actual, header=0, sep=",")
 
-    gene_merged = pd.merge(gene[["gene_id", "TPM"]],
-                           actual, how='inner', on='gene_id')
+    # the concentration file keys ERCC by gene_id (ERCC-00130); its transcript_id
+    # column holds the GenBank accession
+    gene_merged = pd.merge(ercc, actual, how='inner', on='gene_id')
 
     gene_name=args.analysis_path+"/"+args.samplename+".ercc.txt"
     gene_merged.to_csv(gene_name, sep="\t", index=False, header=True)

@@ -18,7 +18,5 @@ snakemake --snakefile ${pipeline_location}/Snakefile --cores 32 \
 --use-singularity \
 --keep-going \
 --singularity-args "-B /hpf/largeprojects/,/hpf/projects/,$SCRATCH:$SCRATCH" \
---nolock --rerun-triggers mtime
-#
-#--rerun-incomplete
+--nolock --rerun-triggers mtime --rerun-incomplete
 #--rerun-triggers mtime

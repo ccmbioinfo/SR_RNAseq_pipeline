@@ -34,7 +34,9 @@ Metric provenance / notable changes vs the old workflow:
                      (no equivalent in the new outputs).
   * Added         -> TIN, inner distance (RSeQC), strandedness, CHRY_PERC /
                      SEX_PRED (chrY expected-count fraction from RSEM, used to
-                     predict sex by a simple threshold).
+                     predict sex by a simple threshold; XIST_TPM is the
+                     second, independent signal, and SEX_PRED is Unclear
+                     when the two disagree).
 """
 
 import argparse
@@ -386,39 +388,68 @@ def parse_expression(path):
     return out
 
 
-def parse_chry_sex(path, chry_genes_path, threshold=0.01):
-    """CHRY_PERC = 100 * sum(expected_count of chrY genes) / sum(expected_count
-    of all genes), from RSEM genes.results; SEX_PRED = Male if CHRY_PERC >
-    threshold else Female. The denominator includes ERCC/SIRV spike-in rows
-    (matching sex_pred_threshold.R). gene_id version suffixes (ENSG....N) are
-    stripped before matching the chrY list. Both fields are NA when genes.results
-    or the chrY list is missing, or total expected_count is zero."""
-    out = {"CHRY_PERC": NA, "SEX_PRED": NA}
+XIST_ID = "ENSG00000229807"
+
+
+def parse_chry_sex(path, chry_genes_path, threshold=0.01, xist_threshold=10.0):
+    """Sex from two independent signals in the salmon -> RSEM gene table:
+
+      CHRY_PERC = 100 * sum(expected_count of chrY genes) / sum(expected_count
+                  of all genes); male evidence when > threshold.
+      XIST_TPM  = XIST TPM; female evidence when > xist_threshold.
+
+    SEX_PRED is Male (chrY high, XIST low), Female (chrY low, XIST high), or
+    Unclear when the two disagree (both high: e.g. XXY or a mixed sample; both
+    low). The chrY list must exclude the PAR genes: Ensembl 115 gives the chrY
+    PAR copies their own gene IDs and salmon splits PAR reads between X and Y,
+    which puts every female at ~0.03% chrY, above the cutoff. With PAR removed,
+    females sit at ~0.0002% and males at ~0.04%. The salmon table has no ERCC/SIRV
+    rows, so they are not in the denominator (shifts CHRY_PERC by <3%). gene_id
+    version suffixes (ENSG....N) are stripped before matching. CHRY_PERC is NA
+    when the chrY list is missing; SEX_PRED is NA unless both signals exist."""
+    out = {"CHRY_PERC": NA, "XIST_TPM": NA, "SEX_PRED": NA}
     if not path or not os.path.exists(path):
         warn("missing RSEM genes.results for chrY/sex: %s" % path)
         return out
+    chry = set()
     if not chry_genes_path or not os.path.exists(chry_genes_path):
         warn("missing chrY gene list: %s" % chry_genes_path)
-        return out
-    with open(chry_genes_path) as fh:
-        chry = {ln.strip().split(".")[0] for ln in fh if ln.strip()}
-    if not chry:
-        warn("chrY gene list is empty: %s" % chry_genes_path)
-        return out
+    else:
+        with open(chry_genes_path) as fh:
+            chry = {ln.strip().split(".")[0] for ln in fh if ln.strip()}
+        if not chry:
+            warn("chrY gene list is empty: %s" % chry_genes_path)
     total = ychr = 0.0
+    xist = None
     for row in read_tsv_dicts(path):
+        gid = (row.get("gene_id") or "").split(".")[0]
+        if gid == XIST_ID:
+            xist = to_float(row.get("TPM"))
         ec = to_float(row.get("expected_count"))
         if ec is None:
             continue
         total += ec
-        if (row.get("gene_id") or "").split(".")[0] in chry:
+        if gid in chry:
             ychr += ec
-    if total <= 0:
-        warn("zero total expected_count; CHRY_PERC/SEX_PRED = NA")
+    perc = None
+    if chry and total > 0:
+        perc = 100.0 * ychr / total
+        out["CHRY_PERC"] = rnd(perc, 4)
+    elif chry:
+        warn("zero total expected_count; CHRY_PERC = NA")
+    if xist is None:
+        warn("XIST (%s) not in %s; XIST_TPM = NA" % (XIST_ID, path))
+    else:
+        out["XIST_TPM"] = rnd(xist)
+    if perc is None or xist is None:
         return out
-    perc = 100.0 * ychr / total
-    out["CHRY_PERC"] = rnd(perc, 4)
-    out["SEX_PRED"] = "Male" if perc > threshold else "Female"
+    y_male, x_female = perc > threshold, xist > xist_threshold
+    if y_male != x_female:
+        out["SEX_PRED"] = "Male" if y_male else "Female"
+    else:
+        out["SEX_PRED"] = "Unclear"
+        warn("sex evidence conflicts: CHRY_PERC=%.4f (cutoff %g), XIST_TPM=%.2f "
+             "(cutoff %g)" % (perc, threshold, xist, xist_threshold))
     return out
 
 
@@ -644,10 +675,15 @@ def build_parser():
                    default="/hpf/largeprojects/tgnode/sandbox/yliang_analysis/"
                            "pacbio_longread/annotation_files/"
                            "Homo_sapiens.GRCh38.115.chrYgenes.txt",
-                   help="list of chrY Ensembl gene IDs (one per line) for "
-                        "CHRY_PERC / SEX_PRED (default: %(default)s)")
+                   help="list of chrY Ensembl gene IDs (one per line), PAR "
+                        "genes excluded, for CHRY_PERC / SEX_PRED "
+                        "(default: %(default)s)")
     p.add_argument("--chry_sex_threshold", type=float, default=0.01,
-                   help="CHRY_PERC%% above which SEX_PRED is Male, else Female "
+                   help="CHRY_PERC%% above which chrY counts as male evidence "
+                        "(default: %(default)s)")
+    p.add_argument("--xist_threshold", type=float, default=10.0,
+                   help="XIST TPM above which XIST counts as female evidence; "
+                        "SEX_PRED is Unclear when the two signals disagree "
                         "(default: %(default)s)")
     # individual overrides; otherwise files are located under --indir by suffix
     p.add_argument("--bam_file")
@@ -688,7 +724,9 @@ def discover_files(opt):
         "bam_file": _find(d, "*.mdup.bam"),
         "duplicate_file": _find(d, "*.duplicate.metrics"),
         "fastp_file": _find(d, "*fastp.json"),
-        "expr_file": _find(d, "*.genes.results"),
+        # salmon -> RSEM-format gene table (rule salmon2RSEM); the old RSEM
+        # *.genes.results is no longer produced
+        "expr_file": _find(d, "*_salmon_rsem.results"),
         "ercc_file": _find(d, "*.ercc.txt"),
         "sirv_file": _find(d, "*.sirv.txt"),
         "tissue_pred_file": _find(d, "*_tissuePred.txt"),
@@ -719,7 +757,7 @@ COLUMNS = [
     "PERCENT_DUPLICATION", "INNER_DISTANCE_MEAN", "INNER_DISTANCE_MEDIAN",
     "TIN_MEDIAN", "TIN_MEAN", "STRANDEDNESS", "PCT_ANTISENSE", "MT_PCT",
     "TPM_0", "TPM_1", "TPM_10", "TPM_50",
-    "CHRY_PERC", "SEX_PRED",
+    "CHRY_PERC", "XIST_TPM", "SEX_PRED",
     "NUM_JUNCS", "KNOWN_JUNCS", "NOVEL_JUNCS",
     "ERCC_TPM_SUM", "ERCC_TPM_0", "ERCC_TPM_1", "ERCC_R2",
     "SIRV_TPM_SUM", "SIRV1", "SIRV2", "SIRV3", "SIRV4", "SIRV5", "SIRV6", "SIRV7",
@@ -760,7 +798,7 @@ def main():
 
     data.update(parse_expression(opt.expr_file))
     data.update(parse_chry_sex(opt.expr_file, opt.chry_genes,
-                               opt.chry_sex_threshold))
+                               opt.chry_sex_threshold, opt.xist_threshold))
     data.update(parse_tissue_pred(opt.tissue_pred_file, s))
     data.update(parse_globin(opt.globin_file))
     data.update(parse_ercc(opt.ercc_file))

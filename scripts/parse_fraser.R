@@ -142,6 +142,9 @@ if (length(missing_req))
        "\n  run with --help for the full option list.")
 if (!file.exists(path.expand(results_file)))
   stop("results file not found: ", results_file)
+# the Snakefile passes the literal "NULL" when no VCF is configured -- that means
+# "not given", not a path, so drop it before the existence check below
+if (!is.null(opt$variants) && toupper(opt$variants) %in% c("NULL", "NA", "")) opt$variants <- NULL
 # -V given but unreadable used to be skipped silently, leaving every variant column NA
 if (!is.null(opt$variants) && nzchar(opt$variants) && !file.exists(opt$variants))
   stop("-V/--variants file not found: ", opt$variants, " (relative paths resolve against ", getwd(), ")")
@@ -585,7 +588,7 @@ if (!is.null(opt$variants) && nzchar(opt$variants)) {
 
   # drop the placeholder cols, then join the computed ones back by junction key.
   res <- res %>%
-    select(-all_of(VARIANT_COLS)) %>%
+    dplyr::select(-all_of(VARIANT_COLS)) %>%
     mutate(start = as.integer(start), end = as.integer(end)) %>%
     left_join(juncs, by = c("seqnames", "start", "end", "strand"))
 
